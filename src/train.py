@@ -104,16 +104,20 @@ def main(view_n, scale, disparity_min, disparity_max, disparity_grad,mask_num_la
     channels = 32
     u_net_channel = 16
 
+    # 生成模型
     model = LFHSR_mask(scale=scale, an=view_n, mask_num_layers=mask_num_layers, mask_channel=channels,
                        fusion_num_layers=fusion_num_layers, fusion_channel=channels,
                        u_net_num_layers=u_net_num_layers, u_net_channel=u_net_channel, up_num_layers=up_num_layers,
                        up_channel=channels)
 
+    # 初始化模型参数，获取模型参数数量
     model.apply(weights_init_xavier)
     utils_train.get_parameter_number(model)
 
+    # 将模型加载到GPU上
     model.cuda()
 
+    # TODO 这两行是什么意思
     optimizer = torch.optim.Adam(model.parameters(), lr=base_lr)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=step_size, gamma=0.5)
 
@@ -137,7 +141,7 @@ def main(view_n, scale, disparity_min, disparity_max, disparity_grad,mask_num_la
     current_iter = 0
     for epoch in range(current_iter, MAX_EPOCH):
         if epoch % test_gap == 0:
-            '''torch.save(model.state_dict(), dir_save_name + 'LFHSR_{}_{}.pkl'.format(scale, str(view_n)))'''
+            torch.save(model.state_dict(), dir_save_name + 'LFHSR_{}_{}.pkl'.format(scale, str(view_n)))
         ''' Training begin'''
         current_iter, train_loss = train_shear(train_loader, model, epoch, view_n, disparity_list, optimizer, scheduler,
                                                current_iter)
