@@ -36,31 +36,21 @@ def str2bool(v):
 def opts_parser():
     usage = "LF-Hybrid-SR"
     parser = ArgumentParser(description=usage)
-    # 上采样比例因子
     parser.add_argument(
         '-S', '--scale', type=int, default=4, dest='scale',
-        help='up-sampling scale factor: (default: %(default)s)'
-    )
-    # 角度分辨率
+        help='up-sampling scale factor: (default: %(default)s)')
     parser.add_argument(
         '-N', '--view_n', type=int, default=9, dest='view_n',
-        help='Angular resolution of input LFs for training: (default: %(default)s)'
-    )
-    # 最小视差
+        help='Angular resolution of input LFs for training: (default: %(default)s)')
     parser.add_argument(
         '-dmin', '--disparity_min', type=int, default=-4, dest='disparity_min',
-        help='the minimum disparity of the LF images: (default: %(default)s)'
-    )
-    # 最大视差
+        help='the minimum disparity of the LF images: (default: %(default)s)')
     parser.add_argument(
         '-dmax', '--disparity_max', type=int, default=4, dest='disparity_max',
-        help='the maximum disparity of the LF images: (default: %(default)s)'
-    )
-    # 视差采样步长
+        help='the maximum disparity of the LF images: (default: %(default)s)')
     parser.add_argument(
         '-dg', '--disparity_grad', type=float, default=0.25, dest='disparity_grad',
-        help='the disparity grad of the MPIs: (default: %(default)s)'
-    )
+        help='the disparity grad of the MPIs: (default: %(default)s)')
     parser.add_argument(
         '-l1', '--mask_num_layers', type=int, default=6, dest='mask_num_layers',
         help='the number of the layers in mask network: (default: %(default)s)')
@@ -101,9 +91,13 @@ def main(view_n, scale, disparity_min, disparity_max, disparity_grad,mask_num_la
     # 提高卷积神经网络的运行速度
     torch.backends.cudnn.benchmark = True
 
-    # 定义数据集路径
+    # 定义生产平台数据集路径
     dir_LFimages = "/mnt/nfs-storage-node-09/LFHSR_hci_train_npy_99/"
-    dir_save_name = "/mnt/nfs-storage-node-09/net_store"
+    dir_save_name = "/mnt/nfs-storage-node-09/net_store/"
+
+    # 定义测试平台数据集路径
+    # dir_LFimages = "../../Datasets/LFHSR_hci_train_npy_99"
+    # dir_save_name = "../net_store/"
 
     # 定义模型
     # TODO 这两个参数是什么意思
@@ -114,8 +108,6 @@ def main(view_n, scale, disparity_min, disparity_max, disparity_grad,mask_num_la
                        fusion_num_layers=fusion_num_layers, fusion_channel=channels,
                        u_net_num_layers=u_net_num_layers, u_net_channel=u_net_channel, up_num_layers=up_num_layers,
                        up_channel=channels)
-
-    # print(model)
 
     model.apply(weights_init_xavier)
     utils_train.get_parameter_number(model)
