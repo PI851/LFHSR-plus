@@ -102,8 +102,8 @@ def main(view_n, scale, disparity_min, disparity_max, disparity_grad,mask_num_la
     torch.backends.cudnn.benchmark = True
 
     # 定义数据集路径
-    dir_LFimages = "../LFHSR_hci_train_npy_99/"
-    dir_save_name = '../net_store/'
+    dir_LFimages = "/mnt/nfs-storage-node-09/LFHSR_hci_train_npy_99/"
+    dir_save_name = "/mnt/nfs-storage-node-09/net_store"
 
     # 定义模型
     # TODO 这两个参数是什么意思
