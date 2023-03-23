@@ -96,14 +96,11 @@ class upSample(nn.Module):
 
 
 class res_block(nn.Module):
-    '''
-    残差块的具体原理和作用有待学习
-    '''
+    # TODO 残差块的具体原理和作用有待学习
     def __init__(self, in_channels, out_channels, kernel_size=3, padding=1, stride=1):
         super(res_block, self).__init__()
         self.conv = nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size,
                               padding=padding, stride=stride)
-        # TODO PReLU是什么函数
         self.PReLU = nn.PReLU()
 
     def forward(self, x):
@@ -116,7 +113,6 @@ class mask_part(nn.Module):
         layers = []
         layers.append(nn.Conv2d(in_channels=in_channels, out_channels=channel, kernel_size=3, padding=1, stride=1))
         layers.append(nn.PReLU())
-        # TODO 级联的残差块个数
         for i in range(num_layers - 1):
             layers.append(res_block(in_channels=channel, out_channels=channel, kernel_size=3, padding=1, stride=1))
 
@@ -283,34 +279,33 @@ class LFHSR_mask(nn.Module):
         B, C, D, X, Y = list(img.shape)
         UV = view_n * view_n
         img = img.permute(2, 0, 1, 3, 4).reshape(D, B * C, X, Y)  # D ,BC, X, Y
-        img1 = img[:,0:1]
-        img2 = img[:,1:2]
+        imgList = []
+        for i in range(B * C - 1):
+            imgList.append(img[:, i:i+1])
         ref_position = []
         for i, v in enumerate(view_position) :  ref_position.append(v.tolist())
-        # TODO 这里和batch_size有关，需要进行优化
-        ref_position1 = ref_position[0]
-        ref_position2 = ref_position[1]
 
         img_all = []
         for i in range(view_n):
             for j in range(view_n):
-                theta1 = []
-                theta2 = []
+                theta = []
+                for k in range(len(ref_position)):
+                    theta.append([])
+
                 for disparity in disparity_list:
                     target_position = np.array([i, j])
-                    d1 = (ref_position1 - target_position) * disparity * 2
-                    d2 = (ref_position2 - target_position) * disparity * 2
-                    theta_t1 = torch.FloatTensor([[1, 0, d1[1] / img.shape[3]], [0, 1, d1[0] / img.shape[2]]])
-                    theta_t2 = torch.FloatTensor([[1, 0, d2[1] / img.shape[3]], [0, 1, d2[0] / img.shape[2]]])
-                    theta1.append(theta_t1.unsqueeze(0))
-                    theta2.append(theta_t2.unsqueeze(0))
-                theta1 = torch.cat(theta1, 0).cuda()
-                theta2 = torch.cat(theta2, 0).cuda()
-                grid1 = F.affine_grid(theta1, img1.size(), align_corners=False)
-                img_tmp1 = F.grid_sample(img1, grid1, align_corners=False)
-                grid2 = F.affine_grid(theta2, img2.size(), align_corners=False)
-                img_tmp2 = F.grid_sample(img2, grid2, align_corners=False)
-                img_tmp = torch.cat((img_tmp1, img_tmp2),dim=1)
+                    d = (ref_position - target_position) * disparity * 2
+                    for k in range(len(ref_position)):
+                        theta_t = torch.FloatTensor([[1, 0, d[k][1] / img.shape[3]], [0, 1, d[0] / img.shape[2]]])
+                        theta[k].append(theta_t.unsqueeze(0))
+
+                for k in range(len(ref_position)):
+                    theta[k] = torch.cat(theta[k], 0).cuda()
+                    grid = F.affine_grid(theta[k], imgList[k].size(), align_corners=False)
+                    if k == 0:
+                        img_tmp = F.grid_sample(imgList[k], grid, align_corners=False)
+                    else:
+                        img_tmp = torch.cat((img_tmp, F.grid_sample(imgList[k], grid, align_corners=False)), dim=1)
                 img_all.append(img_tmp.unsqueeze(0))
         img_all = torch.cat(img_all, dim=0)
         img_all = img_all.reshape(UV, D, B, C, X, Y).permute(2, 3, 1, 0, 4, 5)  # B, C, D, UV, X, Y
