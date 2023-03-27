@@ -280,10 +280,9 @@ class LFHSR_mask(nn.Module):
         UV = view_n * view_n
         img = img.permute(2, 0, 1, 3, 4).reshape(D, B * C, X, Y)  # D ,BC, X, Y
         imgList = []
-        for i in range(B * C - 1):
+        for i in range(B * C):
             imgList.append(img[:, i:i+1])
-        ref_position = []
-        for i, v in enumerate(view_position) :  ref_position.append(v.tolist())
+        ref_position = view_position
 
         img_all = []
         for i in range(view_n):
@@ -296,7 +295,7 @@ class LFHSR_mask(nn.Module):
                     target_position = np.array([i, j])
                     d = (ref_position - target_position) * disparity * 2
                     for k in range(len(ref_position)):
-                        theta_t = torch.FloatTensor([[1, 0, d[k][1] / img.shape[3]], [0, 1, d[0] / img.shape[2]]])
+                        theta_t = torch.FloatTensor([[1, 0, d[k][1] / img.shape[3]], [0, 1, d[k][0] / img.shape[2]]])
                         theta[k].append(theta_t.unsqueeze(0))
 
                 for k in range(len(ref_position)):
@@ -318,15 +317,15 @@ class LFHSR_mask(nn.Module):
 
         lr_LF_shear = lr_LF_shear.reshape(B * D, UV, X, Y)  # BD, UV, X, Y
 
-        # TODO 和batch_size有关，需要进行优化
-        position1 = view_position[0][0] * math.sqrt(UV) + view_position[0][1]
-        position2 = view_position[1][0] * math.sqrt(UV) + view_position[1][1]
+        for i in range(len(view_position)):
+            position = view_position[i][0] * math.sqrt(UV) + view_position[i][1]
+            if i == 0:
+                lr_LF_shear_hr = lr_LF_shear[i*33:(i+1)*33, int(position):int(position + 1)]
+            else:
+                lr_LF_shear_hr = torch.cat((lr_LF_shear_hr, lr_LF_shear[i*33:(i+1)*33,
+                                                            int(position):int(position + 1)]),dim=0)
 
-        # hr_mask = self.mask_part(lr_LF_shear - lr_LF_shear[:, UV // 2:UV // 2 + 1])
-        # TODO 如果提前对view_position进行了转换，这里可能需要改动
-        hr_mask = self.mask_part(lr_LF_shear -
-                                 torch.cat((lr_LF_shear[0:33, int(position1.item()):int(position1.item()) + 1],
-                                            lr_LF_shear[33:66, int(position2.item()):int(position2.item()) + 1]), dim=0))
+        hr_mask = self.mask_part(lr_LF_shear -  lr_LF_shear_hr)
 
         hr_mask = hr_mask.reshape(B, D, self.scale * X, self.scale * Y)
         hr_mask = torch.softmax(hr_mask, dim=1)
@@ -338,7 +337,6 @@ class LFHSR_mask(nn.Module):
         hr_mask = torch.softmax(hr_mask, dim=1)
         hr_mask = hr_mask.permute(0, 2, 1, 3, 4)
 
-        # TODO hr_mask为什么值全为0.303，是bug吗
         hr_mask_deshear = self.warp_reverse_all(hr_mask, -disparity_list, self.an, view_position)
 
         hr_img = hr_img.reshape(B, 1, D, self.scale * X, self.scale * Y)

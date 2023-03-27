@@ -30,7 +30,6 @@ def warp_all(img,  disparity_list, view_n, view_position, align_corners=False):
         for i in range(view_n):
             for j in range(view_n):
                 ref_position = np.array([i, j])
-                # TODO 为什么要乘以2，因为采用GPU运算的原因
                 d = (target_position - ref_position) * disparity * 2
                 # TODO 具体底层是怎么实现warp的呢
                 theta_t = torch.FloatTensor([[1, 0, d[1] / img.shape[3]], [0, 1, d[0] / img.shape[2]]])
@@ -87,7 +86,7 @@ def data_prepare_new(dir_LF, view_n_ori, view_n_new, scale, disparity_list):
     # TODO 为什么要进行这样的维度转化
     lr_y = torch.from_numpy(lr_y.copy()).cuda().reshape(1, 1, -1, lr_X, lr_Y)
 
-    # TODO 为什么低分辨视图的视差范围会变小，感觉公式里和视差有关的变量没有改变，进行优化，将高分辨视角位置设为随机的
+    # TODO 为什么低分辨视图的视差范围会变小，感觉公式里和视差有关的变量没有改变
     # lr_y_sheared = warp_all(lr_y, disparity_list / scale, view_n_new, view_position=[view_n_new // 2, view_n_new // 2])
     lr_y_sheared = warp_all(lr_y, disparity_list / scale, view_n_new, view_position=view_position)
     lr_y_sheared = lr_y_sheared.reshape(D, U, V, lr_X, lr_Y).cpu().numpy()

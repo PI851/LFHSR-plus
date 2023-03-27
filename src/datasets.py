@@ -37,13 +37,9 @@ class RandomCrop(object):
         return train_data_tmp, gt_data_tmp, gt_mask_image
 
 class LFHSR_shear_Dataset(data.Dataset):
-    """
-        1.0：预处理数据
-    """
-
     def __init__(self, dir_LF,repeat=4, view_n_ori=9, view_n_input=9, scale=2, disparity_list=None, crop_size=32, if_flip=False, if_rotation=False, is_all=False):
         """
-
+        生成数据集
         :param dir_LF: 数据路径
         :param repeat:
         :param view_n_ori: 原始光场图像的角分辨率
@@ -97,7 +93,6 @@ class LFHSR_shear_Dataset(data.Dataset):
         '''
 
         return self.repeat * self.numbers
-        # return self.numbers
 
     def __getitem__(self, idx):
 

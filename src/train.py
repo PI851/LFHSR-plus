@@ -6,6 +6,7 @@ import utils_train
 import sys
 from tqdm import tqdm
 from argparse import ArgumentParser, ArgumentTypeError
+from datetime import datetime
 
 from initializers import weights_init_xavier
 from model import LFHSR_mask
@@ -66,18 +67,16 @@ def opts_parser():
     parser.add_argument(
         '-b', '--batch_size', type=int, default=2, dest='batch_size')
     parser.add_argument(
-        '-crop', '--crop_size', type=int, default=32, dest='crop_size',
+        '-crop', '--crop_size', type=int, default=16, dest='crop_size',
         help='the crop_size of the training: (default: %(default)s)')
     parser.add_argument(
         '-lr', '--learning_rate', type=float, default=0.001, dest='base_lr')
     parser.add_argument(
         '-step', '--step_size', type=int, default=1600, dest='step_size',
         help='Learning rate decay every n epochs : (default: %(default)s)')
-    # gpu编号
     parser.add_argument(
         '-g', '--gpu_no', type=int, default=0, dest='gpu_no',
-        help='GPU used: (default: %(default)s)'
-    )
+        help='GPU used: (default: %(default)s)')
 
     return parser
 
@@ -88,16 +87,19 @@ def main(view_n, scale, disparity_min, disparity_max, disparity_grad,mask_num_la
     # 定义可见的GPU
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_no)
 
+    # 因为GPU显存不够
+    # os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:128"
+
     # 提高卷积神经网络的运行速度
     torch.backends.cudnn.benchmark = True
 
     # 定义生产平台数据集路径
-    dir_LFimages = "/mnt/nfs-storage-node-19/LFHSR_hci_train_npy_99/"
-    dir_save_name = "/mnt/nfs-storage-node-19/net_store/"
+    # dir_LFimages = "/mnt/nfs-storage-node-19/LFHSR-plus/LFHSR_hci_train_npy_99/"
+    # dir_save_name = "/mnt/nfs-storage-node-19/LFHSR-plus/net_store/"
 
     # 定义测试平台数据集路径
-    # dir_LFimages = "../../Datasets/LFHSR_hci_train_npy_99"
-    # dir_save_name = "../net_store/"
+    dir_LFimages = "/data/LvYichang/LFHSR-plus/LFHSR_hci_train_npy_99/"
+    dir_save_name = "/data/LvYichang/LFHSR-plus/net_store/"
 
     # 定义模型
     # TODO 这两个参数是什么意思
@@ -126,8 +128,6 @@ def main(view_n, scale, disparity_min, disparity_max, disparity_grad,mask_num_la
     else:
         print('Exist!')
 
-    test_gap = 10
-
     # TODO 生成视差的采样列表（如果取到比最大视差还要大的视差该怎么办，场景不存在这个视差）
     disparity_list = np.arange(disparity_min, disparity_max + disparity_grad, disparity_grad)
     # 获取数据集
@@ -139,12 +139,14 @@ def main(view_n, scale, disparity_min, disparity_max, disparity_grad,mask_num_la
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
     current_iter = 0
+    min_loss = 100
     for epoch in range(current_iter, MAX_EPOCH):
-        if epoch % test_gap == 0:
-            torch.save(model.state_dict(), dir_save_name + 'LFHSR_{}_{}.pkl'.format(scale, str(view_n)))
         ''' Training begin'''
         current_iter, train_loss = train_shear(train_loader, model, epoch, view_n, disparity_list, optimizer, scheduler,
                                                current_iter)
+        if min_loss > train_loss:
+            min_loss = train_loss
+            torch.save(model.state_dict(), dir_save_name + 'LFHSR_{}_{}_{}.pkl'.format(scale, str(view_n), current_iter))
 
 
 def train_shear(train_loader, model, epoch, view_n, disparity_list, optimizer, scheduler, current_iter):
@@ -155,13 +157,13 @@ def train_shear(train_loader, model, epoch, view_n, disparity_list, optimizer, s
 
     count = 0
     for lr_LF_shear, lr_LF, hr_img, view_position, hr_gt, hr_gt_mask in tqdm(train_loader):
-        # TODO 考虑是否在这里将view_position中的每个值转成list
         lr_LF_shear, lr_LF, hr_img, hr_gt, hr_gt_mask = lr_LF_shear.cuda(), lr_LF.cuda(), hr_img.cuda(), hr_gt.cuda(), hr_gt_mask.cuda()
         lr_LF_shear = lr_LF_shear.reshape(lr_LF_shear.shape[0], -1, view_n * view_n, lr_LF_shear.shape[-2],
                                           lr_LF_shear.shape[-1])
         hr_img = hr_img.unsqueeze(1)
         hr_gt = hr_gt.reshape(hr_gt.shape[0], -1, hr_gt.shape[-2], hr_gt.shape[-1])
         # hr_pred, hr_mask_view = model(lr_LF_shear, lr_LF, hr_img, view_position, disparity_list)
+        for i, v in enumerate(view_position): view_position[i] = v.tolist()
         # TODO 优化Loss函数
         hr_pred = model(lr_LF_shear, lr_LF, hr_img, view_position, disparity_list)
 
@@ -177,10 +179,11 @@ def train_shear(train_loader, model, epoch, view_n, disparity_list, optimizer, s
     scheduler.step()
 
     time_end = time.time()
+    train_loss = total_loss / count
     print('=========================================================================')
     print('Train Epoch: {} Learning rate: {:.2e} Time: {:.2f}s Average Loss: {:.6f} '
-          .format(epoch, scheduler.get_last_lr()[0], time_end - time_start, total_loss / count))
-    return current_iter, total_loss / count
+          .format(epoch, scheduler.get_last_lr()[0], time_end - time_start, train_loss))
+    return current_iter, train_loss
 
 
 
