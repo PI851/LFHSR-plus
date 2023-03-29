@@ -6,7 +6,6 @@ import utils_train
 import sys
 from tqdm import tqdm
 from argparse import ArgumentParser, ArgumentTypeError
-from datetime import datetime
 
 from initializers import weights_init_xavier
 from model import LFHSR_mask
@@ -86,9 +85,6 @@ def main(view_n, scale, disparity_min, disparity_max, disparity_grad,mask_num_la
          u_net_num_layers, batch_size, crop_size, base_lr, step_size, gpu_no):
     # 定义可见的GPU
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_no)
-
-    # 因为GPU显存不够
-    # os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:128"
 
     # 提高卷积神经网络的运行速度
     torch.backends.cudnn.benchmark = True
